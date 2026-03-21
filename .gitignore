@@ -43,6 +43,7 @@ app-example
 /android
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 venv/
 __pycache__/
 *.pyc
@@ -50,3 +51,7 @@ __pycache__/
 # in .gitignore
 .env
 >>>>>>> 53bc9fa04d83ab19cad7a292622b7f09620fd532
+=======
+# in .gitignore
+.env
+>>>>>>> 6d11351 (add camera, gemini integration, health screen, navigation)
