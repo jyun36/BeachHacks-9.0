@@ -1,117 +1,208 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { useRef, useState } from "react";
+import { Text, View, TouchableOpacity, Image, ScrollView, Modal } from "react-native";
+import { analyzeItem } from "./gemini";
 
-export default function HomeScreen() {
-  const router = useRouter();
+export default function Index() {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
+
+  const takePhoto = async () => {
+    if (cameraRef.current) {
+      const photo = await cameraRef.current.takePictureAsync({ base64: false });
+      if (photo?.uri) {
+        setPhotos((prev) => [photo.uri, ...prev]);
+        setResult(null);
+        setLoading(true);
+        try {
+          const analysis = await analyzeItem(photo.uri);
+          setResult(analysis);
+          setShowModal(true);
+        } catch (e) {
+          console.error(e);
+        }
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleAddToCompost = () => {
+    setShowModal(false);
+  };
+
+  const handleDismiss = () => {
+    setShowModal(false);
+  };
+
+  if (!permission) return <View />;
+
+  if (!permission.granted) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: "white", marginBottom: 20 }}>We need access to your camera</Text>
+        <TouchableOpacity onPress={requestPermission}
+          style={{ padding: 12, backgroundColor: "green", borderRadius: 8 }}>
+          <Text style={{ color: "white" }}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <View style={{ flex: 1, backgroundColor: "black" }}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.logoBox}>
-          <Ionicons name="leaf" size={22} color="#fff" />
+      {/* Camera */}
+      <View style={{ flex: 1 }}>
+        <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
+
+        {/* Corner overlay + item name inside */}
+        <View style={{ position: "absolute", top: 200, left: 0, right: 0,
+          alignItems: "center", pointerEvents: "none" }}>
+          <View style={{ width: 250, height: 250, position: "relative",
+            justifyContent: "center", alignItems: "center" }}>
+
+            {/* Top Left */}
+            <View style={{ position: "absolute", top: 0, left: 0, width: 40, height: 40,
+              borderTopWidth: 4, borderLeftWidth: 4, borderColor: "white" }} />
+            {/* Top Right */}
+            <View style={{ position: "absolute", top: 0, right: 0, width: 40, height: 40,
+              borderTopWidth: 4, borderRightWidth: 4, borderColor: "white" }} />
+            {/* Bottom Left */}
+            <View style={{ position: "absolute", bottom: 0, left: 0, width: 40, height: 40,
+              borderBottomWidth: 4, borderLeftWidth: 4, borderColor: "white" }} />
+            {/* Bottom Right */}
+            <View style={{ position: "absolute", bottom: 0, right: 0, width: 40, height: 40,
+              borderBottomWidth: 4, borderRightWidth: 4, borderColor: "white" }} />
+
+            {/* Item name inside box */}
+            {loading && (
+              <Text style={{ color: "white", fontSize: 14, fontWeight: "600",
+                textShadowColor: "black", textShadowRadius: 4 }}>
+                Analyzing... 🔍
+              </Text>
+            )}
+            {result && !loading && (
+              <View style={{ alignItems: "center" }}>
+                <Text style={{
+                  color: result.compostable ? "#4ade80" : "#f87171",
+                  fontSize: 16, fontWeight: "bold", textAlign: "center",
+                  textShadowColor: "black", textShadowRadius: 6,
+                }}>
+                  {result.item}
+                </Text>
+                <Text style={{ fontSize: 20, marginTop: 4 }}>
+                  {result.compostable ? "✅" : "❌"}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-        <Text style={styles.logoText}>CompostAI</Text>
-      </View>
 
-      {/* Hero Text */}
-      <View style={styles.hero}>
-        <View style={styles.badge}>
-          <Ionicons name="sparkles" size={14} color="#059669" />
-          <Text style={styles.badgeText}>Powered by Google Gemini & Fetch.ai</Text>
+        {/* Shutter button */}
+        <View style={{ position: "absolute", bottom: 80, left: 0, right: 0,
+          alignItems: "center" }}>
+          <TouchableOpacity onPress={takePhoto}
+            style={{ width: 70, height: 70, borderRadius: 35,
+              backgroundColor: "white", borderWidth: 4, borderColor: "#ccc" }} />
         </View>
-        <Text style={styles.heroTitle}>Know What's{"\n"}Compostable</Text>
-        <Text style={styles.heroSubtitle}>
-          Point your camera at any item and instantly discover if it belongs in your compost bin
-        </Text>
       </View>
 
-      {/* Hero Image */}
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: "https://images.unsplash.com/photo-1611735341450-74d61e660ad2?w=800&q=80" }}
-          style={styles.heroImage}
-          resizeMode="cover"
-        />
-        <View style={styles.imageOverlay} />
-      </View>
+      {/* Photo list */}
+      {photos.length > 0 && (
+        <View style={{ height: 120, backgroundColor: "black" }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ padding: 10, gap: 8 }}>
+            {photos.map((uri, i) => (
+              <Image key={i} source={{ uri }}
+                style={{ width: 90, height: 90, borderRadius: 8 }} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
-      {/* Action Buttons */}
-      <View style={styles.buttons}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/scan")}>
-          <Ionicons name="camera" size={24} color="#fff" />
-          <Text style={styles.primaryBtnText}>Scan an Item</Text>
-        </TouchableOpacity>
+      {/* Result Popup Modal */}
+      <Modal visible={showModal} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: "flex-end",
+          backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View style={{ backgroundColor: "white", borderTopLeftRadius: 24,
+            borderTopRightRadius: 24, padding: 28 }}>
 
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/pile")}>
-          <Ionicons name="leaf" size={24} color="#059669" />
-          <Text style={styles.secondaryBtnText}>My Compost Pile</Text>
-        </TouchableOpacity>
+            {result?.compostable ? (
+              <>
+                <Text style={{ fontSize: 48, textAlign: "center" }}>♻️</Text>
+                <Text style={{ fontSize: 22, fontWeight: "bold", color: "#059669",
+                  textAlign: "center", marginTop: 8 }}>
+                  Compostable!
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "#111827",
+                  textAlign: "center", marginTop: 4 }}>
+                  {result?.item}
+                </Text>
+                <Text style={{ fontSize: 14, color: "#6b7280", textAlign: "center",
+                  marginTop: 8, marginBottom: 24 }}>
+                  {result?.reason}
+                </Text>
 
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/health")}>
-          <Ionicons name="stats-chart" size={24} color="#059669" />
-          <Text style={styles.secondaryBtnText}>Pile Health</Text>
-        </TouchableOpacity>
-      </View>
+                <TouchableOpacity onPress={handleAddToCompost}
+                  style={{ backgroundColor: "#059669", borderRadius: 14,
+                    paddingVertical: 16, alignItems: "center", marginBottom: 12 }}>
+                  <Text style={{ color: "white", fontWeight: "bold", fontSize: 16 }}>
+                    ✅ Add to My Compost Pile
+                  </Text>
+                </TouchableOpacity>
 
-    </ScrollView>
+                <TouchableOpacity onPress={handleDismiss}
+                  style={{ backgroundColor: "#f3f4f6", borderRadius: 14,
+                    paddingVertical: 16, alignItems: "center" }}>
+                  <Text style={{ color: "#374151", fontWeight: "600", fontSize: 16 }}>
+                    Skip
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={{ fontSize: 48, textAlign: "center" }}>🚫</Text>
+                <Text style={{ fontSize: 22, fontWeight: "bold", color: "#dc2626",
+                  textAlign: "center", marginTop: 8 }}>
+                  Not Compostable
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "#111827",
+                  textAlign: "center", marginTop: 4 }}>
+                  {result?.item}
+                </Text>
+                <Text style={{ fontSize: 14, color: "#6b7280", textAlign: "center",
+                  marginTop: 8 }}>
+                  {result?.reason}
+                </Text>
+
+                <View style={{ backgroundColor: "#fef3c7", borderRadius: 12,
+                  padding: 16, marginTop: 16, marginBottom: 24 }}>
+                  <Text style={{ fontWeight: "600", color: "#92400e", marginBottom: 4 }}>
+                    ♻️ How to dispose:
+                  </Text>
+                  <Text style={{ color: "#b45309", fontSize: 13 }}>
+                    Place this item in your recycling or general waste bin. Do not add to compost as it may contaminate your pile.
+                  </Text>
+                </View>
+
+                <TouchableOpacity onPress={handleDismiss}
+                  style={{ backgroundColor: "#f3f4f6", borderRadius: 14,
+                    paddingVertical: 16, alignItems: "center" }}>
+                  <Text style={{ color: "#374151", fontWeight: "600", fontSize: 16 }}>
+                    Got it
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+          </View>
+        </View>
+      </Modal>
+
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#f0fdf4" },
-  content: { padding: 24, paddingBottom: 40 },
-
-  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 32 },
-  logoBox: {
-    width: 44, height: 44, borderRadius: 14,
-    backgroundColor: "#059669",
-    justifyContent: "center", alignItems: "center",
-  },
-  logoText: { fontSize: 20, fontWeight: "600", color: "#111827" },
-
-  hero: { alignItems: "center", marginBottom: 28 },
-  badge: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 999, marginBottom: 16,
-  },
-  badgeText: { fontSize: 12, color: "#374151" },
-  heroTitle: {
-    fontSize: 38, fontWeight: "bold", color: "#111827",
-    textAlign: "center", lineHeight: 46, marginBottom: 12,
-  },
-  heroSubtitle: {
-    fontSize: 16, color: "#6b7280", textAlign: "center", lineHeight: 24,
-  },
-
-  imageContainer: {
-    borderRadius: 24, overflow: "hidden",
-    marginBottom: 28,
-    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 16, elevation: 8,
-  },
-  heroImage: { width: "100%", height: 220 },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.2)",
-  },
-
-  buttons: { gap: 12 },
-  primaryBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
-    backgroundColor: "#059669",
-    paddingVertical: 18, borderRadius: 18,
-    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
-  },
-  primaryBtnText: { fontSize: 18, fontWeight: "600", color: "#fff" },
-  secondaryBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
-    backgroundColor: "#fff",
-    paddingVertical: 18, borderRadius: 18,
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-  },
-  secondaryBtnText: { fontSize: 18, fontWeight: "600", color: "#111827" },
-});
