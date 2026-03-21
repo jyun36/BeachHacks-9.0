@@ -38,7 +38,7 @@ export default function Index() {
         <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
 
         {/* Corner overlay */}
-        <View style={{ position: "absolute", top: 100, left: 0, right: 0,
+        <View style={{ position: "absolute", top: 200, left: 0, right: 0,
         alignItems: "center", pointerEvents: "none" }}>
           <View style={{ width: 250, height: 250, position: "relative" }}>
             {/* Top Left */}
@@ -77,6 +77,10 @@ export default function Index() {
           </ScrollView>
         </View>
       )}
+
+    </View>
+  );
+}
 
     </View>
   );
