@@ -10,8 +10,8 @@ export async function analyzeItem(photoUri: string) {
     });
 
     const model = genAI.getGenerativeModel(
-      { model: "gemini-1.5-flash" },
-      { apiVersion: "v1" }
+      { model: "gemini-2.5-flash" },
+      { apiVersion: "v1beta" }
     );
 
     const result = await model.generateContent([
