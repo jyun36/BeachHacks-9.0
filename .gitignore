@@ -42,6 +42,11 @@ app-example
 /ios
 /android
 
+<<<<<<< HEAD
 venv/
 __pycache__/
 *.pyc
+=======
+# in .gitignore
+.env
+>>>>>>> 53bc9fa04d83ab19cad7a292622b7f09620fd532

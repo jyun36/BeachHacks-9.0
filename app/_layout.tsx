@@ -1,5 +1,37 @@
-import { Stack } from "expo-router";
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function RootLayout() {
-  return <Stack />;
+  return (
+    <Tabs screenOptions={{ tabBarActiveTintColor: "#059669", headerShown: false }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: "Scan",
+          tabBarIcon: ({ color, size }) => <Ionicons name="camera" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="pile"
+        options={{
+          title: "My Pile",
+          tabBarIcon: ({ color, size }) => <Ionicons name="leaf" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="health"
+        options={{
+          title: "Health",
+          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart" size={size} color={color} />,
+        }}
+      />
+    </Tabs>
+  );
 }
