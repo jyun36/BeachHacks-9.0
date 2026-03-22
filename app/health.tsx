@@ -1,16 +1,45 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { getAvgCN, getHealthScore, getPile } from "./pileStore";
-import { useFocusEffect } from "@react-navigation/native";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { getPile, PileItem } from "../src/pileStore";
 
-function getStatus(avgCN: number) {
-  if (avgCN < 15) return { status: "Too Nitrogen-Heavy", methane: "High" };
-  if (avgCN < 25) return { status: "Slightly Nitrogen-Heavy", methane: "Medium" };
-  if (avgCN <= 30) return { status: "Excellent Condition", methane: "Low" };
-  if (avgCN <= 60) return { status: "Slightly Carbon-Heavy", methane: "Low" };
-  return { status: "Too Carbon-Heavy", methane: "Low" };
+function calculateHealth(items: PileItem[]) {
+  if (items.length === 0) return null;
+
+  const avgCN = items.reduce((s, i) => s + i.cn_ratio, 0) / items.length;
+  const avgWeeks = items.reduce((s, i) => s + i.decomp_weeks, 0) / items.length;
+  const lowMethaneCount = items.filter(i => i.methane === "low").length;
+
+  const cnScore = Math.max(0, 100 - Math.abs(avgCN - 27.5) * 2.5);
+  const methaneScore = (lowMethaneCount / items.length) * 100;
+  const decompScore = Math.max(0, 100 - Math.max(0, avgWeeks - 8) * 5);
+
+  const score = Math.round(cnScore * 0.6 + methaneScore * 0.25 + decompScore * 0.15);
+
+  let status = "";
+  if (score >= 85) status = "Excellent";
+  else if (score >= 65) status = "Good";
+  else if (score >= 45) status = "Needs Work";
+  else status = "Poor";
+
+  let cnStatus = "";
+  if (avgCN < 15) cnStatus = "Too Nitrogen-Heavy";
+  else if (avgCN < 25) cnStatus = "Slightly Nitrogen-Heavy";
+  else if (avgCN <= 30) cnStatus = "Ideal Range";
+  else if (avgCN <= 60) cnStatus = "Slightly Carbon-Heavy";
+  else cnStatus = "Too Carbon-Heavy";
+
+  return {
+    score, status, cnStatus,
+    avgCN: Math.round(avgCN),
+    avgWeeks: Math.round(avgWeeks),
+    methane: lowMethaneCount >= items.length / 2 ? "Low" : "High",
+    materialBalance: Math.round(cnScore),
+    decompRate: Math.round(decompScore),
+    envImpact: Math.round(methaneScore),
+    nutrientQuality: Math.round((cnScore + methaneScore) / 2),
+  };
 }
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
@@ -23,24 +52,21 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 
 export default function HealthScreen() {
   const router = useRouter();
-  const [, refresh] = useState(0);
+  const [pile, setPile] = useState<PileItem[]>([]);
 
-  useFocusEffect(useCallback(() => { refresh(n => n + 1); }, []));
+  useFocusEffect(useCallback(() => {
+    getPile().then(setPile);
+  }, []));
 
-  const pile = getPile();
-  if (pile.length === 0) {
+  const result = calculateHealth(pile);
+
+  if (!result) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No items in your pile yet. Scan something!</Text>
+        <Text style={styles.emptyText}>No items in your pile yet.</Text>
       </View>
     );
   }
-
-  const avgCN = getAvgCN();
-  const score = getHealthScore();
-  const { status, methane } = getStatus(avgCN);
-  const decompWeeks = Math.round(avgCN / 10);
-  const result = { score, status, avgCN: Math.round(avgCN), methane, decompWeeks };
 
   return (
     <View style={styles.root}>
@@ -86,8 +112,10 @@ export default function HealthScreen() {
             </View>
             <Text style={styles.metricLabel}>C:N Ratio</Text>
             <Text style={styles.metricValue}>{result.avgCN}:1</Text>
-            <Text style={[styles.metricNote, { color: result.avgCN >= 25 && result.avgCN <= 30 ? "#10b981" : "#f59e0b" }]}>
-              {result.avgCN >= 25 && result.avgCN <= 30 ? "✓ Ideal range" : "⚠ Off balance"}
+            <Text style={[styles.metricNote, {
+              color: result.avgCN >= 25 && result.avgCN <= 30 ? "#10b981" : "#f59e0b"
+            }]}>
+              {result.avgCN >= 25 && result.avgCN <= 30 ? "✓ Ideal range" : `⚠ ${result.cnStatus}`}
             </Text>
           </View>
 
@@ -97,7 +125,9 @@ export default function HealthScreen() {
             </View>
             <Text style={styles.metricLabel}>Methane Output</Text>
             <Text style={styles.metricValue}>{result.methane}</Text>
-            <Text style={[styles.metricNote, { color: result.methane === "Low" ? "#10b981" : "#dc2626" }]}>
+            <Text style={[styles.metricNote, {
+              color: result.methane === "Low" ? "#10b981" : "#dc2626"
+            }]}>
               {result.methane === "Low" ? "✓ Eco-friendly" : "⚠ High risk"}
             </Text>
           </View>
@@ -107,7 +137,7 @@ export default function HealthScreen() {
               <Ionicons name="time" size={22} color="#d97706" />
             </View>
             <Text style={styles.metricLabel}>Decomp. Time</Text>
-            <Text style={styles.metricValue}>~{result.decompWeeks} weeks</Text>
+            <Text style={styles.metricValue}>~{result.avgWeeks} weeks</Text>
             <Text style={styles.metricNote}>Average</Text>
           </View>
         </View>
@@ -125,40 +155,48 @@ export default function HealthScreen() {
             <Text style={styles.suggestionEmoji}>🎯</Text>
             <View style={styles.suggestionText}>
               <Text style={styles.suggestionTitle}>
-                {result.avgCN >= 25 && result.avgCN <= 30 ? "Perfect Balance" : result.avgCN < 25 ? "Add Carbon Materials" : "Add Nitrogen Materials"}
+                {result.avgCN >= 25 && result.avgCN <= 30
+                  ? "Perfect Balance"
+                  : result.avgCN < 25 ? "Add Carbon Materials" : "Add Nitrogen Materials"}
               </Text>
               <Text style={styles.suggestionBody}>
                 {result.avgCN >= 25 && result.avgCN <= 30
                   ? "Your C:N ratio is excellent! Keep adding materials at your current pace."
                   : result.avgCN < 25
-                  ? "Your pile is nitrogen-heavy. Add cardboard, dry leaves, or paper to balance it."
+                  ? "Your pile is nitrogen-heavy. Add cardboard, dry leaves, or wood chips to balance it."
                   : "Your pile needs more nitrogen. Add fruit scraps, grass clippings, or coffee grounds."}
               </Text>
             </View>
           </View>
 
           <View style={[styles.suggestionCard, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]}>
-            <Text style={styles.suggestionEmoji}>💧</Text>
+            <Text style={styles.suggestionEmoji}>
+              {result.avgWeeks <= 8 ? "⚡" : "🐢"}
+            </Text>
             <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle}>Moisture Check</Text>
+              <Text style={styles.suggestionTitle}>
+                {result.avgWeeks <= 8 ? "Fast Decomposition" : "Slow Decomposition"}
+              </Text>
               <Text style={styles.suggestionBody}>
-                Turn your pile every 3–4 days to maintain optimal moisture and aeration.
+                {result.avgWeeks <= 8
+                  ? `Estimated ~${result.avgWeeks} weeks to compost. Turn your pile every 3–4 days to maintain moisture.`
+                  : `Estimated ~${result.avgWeeks} weeks. Chop items smaller and add nitrogen-rich materials to speed things up.`}
               </Text>
             </View>
           </View>
 
           <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
             <Text style={styles.suggestionEmoji}>
-              {result.methane === "Low" ? "⚡" : "⚠️"}
+              {result.methane === "Low" ? "🌿" : "⚠️"}
             </Text>
             <View style={styles.suggestionText}>
               <Text style={styles.suggestionTitle}>
-                {result.methane === "Low" ? "Speed Boost" : "Methane Warning"}
+                {result.methane === "Low" ? "Low Methane Emissions" : "Methane Warning"}
               </Text>
               <Text style={styles.suggestionBody}>
                 {result.methane === "Low"
-                  ? "Chop larger items into smaller pieces to accelerate decomposition by 30%."
-                  : "Your pile has high methane risk. Add more carbon materials and turn it more frequently."}
+                  ? "Your pile is aerobic and eco-friendly. Keep turning it regularly to maintain airflow."
+                  : "High methane risk detected. Add more carbon-rich dry materials and turn your pile more frequently."}
               </Text>
             </View>
           </View>
@@ -168,11 +206,11 @@ export default function HealthScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Health Breakdown</Text>
           {[
-            { label: "Material Balance", value: result.score, color: result.score >= 70 ? "#10b981" : "#f59e0b" },
-            { label: "Decomposition Rate", value: Math.min(100, Math.round(100 - result.decompWeeks * 3)), color: "#10b981" },
-            { label: "Environmental Impact", value: result.methane === "Low" ? 92 : result.methane === "Medium" ? 60 : 30, color: result.methane === "Low" ? "#10b981" : "#f59e0b" },
-            { label: "Nutrient Quality", value: Math.min(100, Math.round(result.score * 0.9)), color: result.score >= 70 ? "#10b981" : "#f59e0b" },
-          ].map((item) => (
+            { label: "Material Balance", value: result.materialBalance },
+            { label: "Decomposition Rate", value: result.decompRate },
+            { label: "Environmental Impact", value: result.envImpact },
+            { label: "Nutrient Quality", value: result.nutrientQuality },
+          ].map((item) => ({ ...item, color: item.value >= 65 ? "#10b981" : item.value >= 45 ? "#f59e0b" : "#ef4444" })).map((item) => (
             <View key={item.label} style={styles.breakdownRow}>
               <View style={styles.breakdownLabelRow}>
                 <Text style={styles.breakdownLabel}>{item.label}</Text>

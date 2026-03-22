@@ -1,86 +1,134 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useState } from "react";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { getPile, clearPile, removeFromPile, PileItem } from "../src/pileStore";
 import { Ionicons } from "@expo/vector-icons";
-import { getPile, clearPile, PileItem, getHealthScore } from "./pileStore";
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback } from "react";
 
 export default function PileScreen() {
-  const [items, setItems] = useState<PileItem[]>([]);
-  const insets = useSafeAreaInsets();
+  const [pile, setPile] = useState<PileItem[]>([]);
 
-  // Refresh pile every time this tab is focused
-  useFocusEffect(
-    useCallback(() => {
-      setItems(getPile());
-    }, [])
-  );
+  useFocusEffect(useCallback(() => {
+    getPile().then(setPile);
+  }, []));
 
   const handleClear = () => {
-    clearPile();
-    setItems([]);
+    Alert.alert("Clear Pile", "Remove all items from your compost pile?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear All", style: "destructive",
+        onPress: async () => {
+          await clearPile();
+          setPile([]);
+        },
+      },
+    ]);
   };
 
-  if (items.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="leaf-outline" size={64} color="#d1fae5" />
-        <Text style={styles.emptyTitle}>Your pile is empty</Text>
-        <Text style={styles.emptySubtitle}>Scan items and add them to see your pile here</Text>
-      </View>
-    );
-  }
+  const handleRemove = async (id: string) => {
+    await removeFromPile(id);
+    getPile().then(setPile);
+  };
 
-  const compostableCount = items.filter((i) => i.compostable).length;
-  const healthScore = getHealthScore();
+  const totalItems = pile.length;
+  const avgCN = totalItems > 0
+    ? Math.round(pile.reduce((s, i) => s + i.cn_ratio, 0) / totalItems)
+    : 0;
+  const avgWeeks = totalItems > 0
+    ? Math.round(pile.reduce((s, i) => s + i.decomp_weeks, 0) / totalItems)
+    : 0;
 
   return (
     <View style={styles.root}>
+
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>My Compost Pile</Text>
-        <TouchableOpacity onPress={handleClear}>
-          <Text style={styles.clearBtn}>Clear All</Text>
-        </TouchableOpacity>
+        {pile.length > 0 && (
+          <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+            <Text style={styles.clearText}>Clear All</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Summary */}
-      <View style={styles.summary}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryNumber}>{items.length}</Text>
-          <Text style={styles.summaryLabel}>Total Items</Text>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{totalItems}</Text>
+          <Text style={styles.statLabel}>Items</Text>
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryNumber, { color: "#059669" }]}>{compostableCount}</Text>
-          <Text style={styles.summaryLabel}>Compostable</Text>
+        <View style={styles.statDivider} />
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{avgCN > 0 ? `${avgCN}:1` : "--"}</Text>
+          <Text style={styles.statLabel}>Avg C:N</Text>
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryNumber, { color: "#059669" }]}>{healthScore}</Text>
-          <Text style={styles.summaryLabel}>Health Score</Text>
+        <View style={styles.statDivider} />
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{avgWeeks > 0 ? `~${avgWeeks}` : "--"}</Text>
+          <Text style={styles.statLabel}>Est. Weeks</Text>
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {items.map((item, i) => (
-          <View key={i} style={styles.itemCard}>
-            <View style={[styles.itemIcon, { backgroundColor: item.compostable ? "#d1fae5" : "#fee2e2" }]}>
-              <Text style={styles.itemEmoji}>{item.compostable ? "♻️" : "🚫"}</Text>
+      {/* Empty State */}
+      {pile.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={{ fontSize: 64 }}>🪣</Text>
+          <Text style={styles.emptyTitle}>Your pile is empty</Text>
+          <Text style={styles.emptySubtext}>
+            Scan compostable items and tap{"\n"}"Add to My Compost Pile" to get started!
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {pile.map((item, i) => (
+            <View key={item.id} style={styles.itemCard}>
+
+              {/* Number badge */}
+              <View style={styles.numberBadge}>
+                <Text style={styles.numberText}>{i + 1}</Text>
+              </View>
+
+              {/* Icon */}
+              <View style={styles.itemIcon}>
+                <Text style={{ fontSize: 22 }}>🌱</Text>
+              </View>
+
+              {/* Info */}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemName}>{item.item}</Text>
+                <View style={styles.tagRow}>
+                  <View style={[styles.tag, { backgroundColor: "#d1fae5" }]}>
+                    <Text style={[styles.tagText, { color: "#065f46" }]}>
+                      C:N {item.cn_ratio}:1
+                    </Text>
+                  </View>
+                  <View style={[styles.tag, { backgroundColor: "#dbeafe" }]}>
+                    <Text style={[styles.tagText, { color: "#1e40af" }]}>
+                      {item.decomp_weeks}wks
+                    </Text>
+                  </View>
+                  <View style={[styles.tag, {
+                    backgroundColor: item.methane === "low" ? "#f0fdf4" : "#fef3c7"
+                  }]}>
+                    <Text style={[styles.tagText, {
+                      color: item.methane === "low" ? "#166534" : "#92400e"
+                    }]}>
+                      CH₄ {item.methane}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Remove button */}
+              <TouchableOpacity onPress={() => handleRemove(item.id)} style={styles.removeBtn}>
+                <Ionicons name="close" size={16} color="#9ca3af" />
+              </TouchableOpacity>
+
             </View>
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemMeta}>C:N — {item.cn_ratio}:1</Text>
-            </View>
-            <View style={[styles.itemBadge, { backgroundColor: item.compostable ? "#d1fae5" : "#fee2e2" }]}>
-              <Text style={[styles.itemBadgeText, { color: item.compostable ? "#059669" : "#dc2626" }]}>
-                {item.compostable ? "Compostable" : "No"}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
+
     </View>
   );
 }
@@ -88,46 +136,64 @@ export default function PileScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#f0fdf4" },
 
-  emptyContainer: {
-    flex: 1, justifyContent: "center", alignItems: "center",
-    backgroundColor: "#f0fdf4", gap: 12,
-  },
-  emptyTitle: { fontSize: 20, fontWeight: "600", color: "#374151" },
-  emptySubtitle: { fontSize: 14, color: "#9ca3af", textAlign: "center", paddingHorizontal: 40 },
-
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 20, paddingVertical: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "white",
     borderBottomWidth: 1, borderBottomColor: "#e5e7eb",
   },
-  headerTitle: { fontSize: 18, fontWeight: "600", color: "#111827" },
-  clearBtn: { fontSize: 14, color: "#dc2626", fontWeight: "500" },
+  headerTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  clearBtn: {
+    backgroundColor: "#fee2e2", paddingHorizontal: 12,
+    paddingVertical: 6, borderRadius: 8,
+  },
+  clearText: { color: "#dc2626", fontWeight: "600", fontSize: 13 },
 
-  summary: {
-    flexDirection: "row", backgroundColor: "#fff",
-    marginHorizontal: 20, marginTop: 16,
+  statsRow: {
+    flexDirection: "row", backgroundColor: "white",
+    marginHorizontal: 16, marginTop: 16,
     borderRadius: 16, padding: 16,
-    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  summaryItem: { flex: 1, alignItems: "center" },
-  summaryNumber: { fontSize: 24, fontWeight: "bold", color: "#111827" },
-  summaryLabel: { fontSize: 11, color: "#6b7280", marginTop: 2 },
-  summaryDivider: { width: 1, backgroundColor: "#e5e7eb" },
+  statCard: { flex: 1, alignItems: "center" },
+  statNumber: { fontSize: 26, fontWeight: "800", color: "#059669" },
+  statLabel: { fontSize: 12, color: "#6b7280", marginTop: 2 },
+  statDivider: { width: 1, backgroundColor: "#e5e7eb", marginVertical: 4 },
 
-  scroll: { flex: 1 },
-  scrollContent: { padding: 20, gap: 10 },
+  empty: {
+    flex: 1, justifyContent: "center", alignItems: "center",
+    gap: 8, paddingHorizontal: 40,
+  },
+  emptyTitle: { fontSize: 20, fontWeight: "700", color: "#374151", marginTop: 8 },
+  emptySubtext: {
+    fontSize: 14, color: "#9ca3af",
+    textAlign: "center", lineHeight: 20,
+  },
 
+  list: { padding: 16, gap: 10 },
   itemCard: {
+    backgroundColor: "white", borderRadius: 14, padding: 14,
     flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#fff", borderRadius: 14, padding: 14,
-    shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  itemIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  itemEmoji: { fontSize: 22 },
-  itemInfo: { flex: 1 },
-  itemName: { fontSize: 15, fontWeight: "600", color: "#111827", textTransform: "capitalize" },
-  itemMeta: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  itemBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  itemBadgeText: { fontSize: 11, fontWeight: "600" },
+  numberBadge: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "#059669",
+    justifyContent: "center", alignItems: "center",
+  },
+  numberText: { color: "white", fontWeight: "700", fontSize: 13 },
+  itemIcon: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: "#d1fae5",
+    justifyContent: "center", alignItems: "center",
+  },
+  itemName: { fontSize: 15, fontWeight: "600", color: "#111827", marginBottom: 6 },
+  tagRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  tagText: { fontSize: 11, fontWeight: "600" },
+  removeBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center", alignItems: "center",
+  },
 });
