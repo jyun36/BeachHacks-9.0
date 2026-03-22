@@ -7,8 +7,8 @@ export default function RootLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          title: "Scan",
+          tabBarIcon: ({ color, size }) => <Ionicons name="camera" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
