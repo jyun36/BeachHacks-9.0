@@ -2,6 +2,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { Text, View, TouchableOpacity, Image, ScrollView, Modal } from "react-native";
 import { analyzeItem } from "../src/gemini";
+import { addToPile } from "./pileStore";
 
 export default function Index() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -31,6 +32,14 @@ export default function Index() {
   };
 
   const handleAddToCompost = () => {
+    if (result) {
+      addToPile({
+        name: result.item,
+        compostable: result.compostable,
+        cn_ratio: result.cn_ratio ?? "unknown",
+        addedAt: Date.now(),
+      });
+    }
     setShowModal(false);
   };
 
