@@ -113,6 +113,39 @@ Return only the 3 tips as a JSON array of strings, nothing else. Example format:
     tips = json.loads(text.strip())
     return tips if isinstance(tips, list) and len(tips) == 3 else None
 
+class ChatRequest(Model):
+    message: str
+    items: List[PileItem]
+
+class ChatResponse(Model):
+    reply: str
+
+def get_chat_reply(message: str, items: List[PileItem]) -> str:
+    if items:
+        item_list = "\n".join(
+            f"- {i.item} (C:N ratio {i.cn_ratio}:1, {i.decomp_weeks} weeks to decompose, methane: {i.methane})"
+            for i in items
+        )
+        pile_context = f"The user currently has these items in their compost pile:\n{item_list}"
+    else:
+        pile_context = "The user's compost pile is currently empty."
+
+    prompt = f"""You are a friendly composting expert AI assistant. Answer the user's question about composting.
+
+{pile_context}
+
+User question: {message}
+
+Give a helpful, concise answer in 2-3 sentences. Be specific and reference their actual pile items when relevant."""
+
+    key = os.environ.get("GEMINI_KEY", "")
+    res = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}",
+        json={"contents": [{"parts": [{"text": prompt}]}]},
+        timeout=10,
+    )
+    return res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+
 agent = Agent(
     name="compost_advisor",
     seed=os.environ.get("AGENT_SEED", "compost_seed"),
@@ -151,6 +184,16 @@ async def analyze(ctx: Context, req: PileRequest) -> PileResponse:
         decomp_weeks=avg_weeks,
         improvements=tips
     )
+
+@agent.on_rest_post("/chat", ChatRequest, ChatResponse)
+async def chat(ctx: Context, req: ChatRequest) -> ChatResponse:
+    try:
+        reply = get_chat_reply(req.message, req.items)
+        ctx.logger.info("Chat reply generated")
+    except Exception as e:
+        ctx.logger.warning(f"Chat Gemini failed: {e}")
+        reply = "I'm having trouble connecting right now. Try asking again in a moment."
+    return ChatResponse(reply=reply)
 
 @agent.on_event("startup")
 async def startup(ctx: Context):

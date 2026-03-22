@@ -41,6 +41,13 @@ export default function RootLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart" size={size} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Chat",
+          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-ellipses" size={size} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
