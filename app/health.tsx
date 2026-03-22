@@ -1,6 +1,7 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { getPile, PileItem } from "../src/pileStore";
 
@@ -52,6 +53,7 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 
 export default function HealthScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [pile, setPile] = useState<PileItem[]>([]);
 
   useFocusEffect(useCallback(() => {
@@ -63,6 +65,7 @@ export default function HealthScreen() {
   if (!result) {
     return (
       <View style={styles.emptyContainer}>
+        <Ionicons name="leaf-outline" size={48} color="#059669" />
         <Text style={styles.emptyText}>No items in your pile yet.</Text>
       </View>
     );
@@ -71,7 +74,7 @@ export default function HealthScreen() {
   return (
     <View style={styles.root}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#374151" />
         </TouchableOpacity>
@@ -103,7 +106,7 @@ export default function HealthScreen() {
             </View>
             <Text style={styles.metricLabel}>Moisture Level</Text>
             <Text style={styles.metricValue}>Optimal</Text>
-            <ProgressBar value={75} color="#10b981" />
+            <ProgressBar value={75} color="#059669" />
           </View>
 
           <View style={styles.metricCard}>
@@ -113,28 +116,28 @@ export default function HealthScreen() {
             <Text style={styles.metricLabel}>C:N Ratio</Text>
             <Text style={styles.metricValue}>{result.avgCN}:1</Text>
             <Text style={[styles.metricNote, {
-              color: result.avgCN >= 25 && result.avgCN <= 30 ? "#10b981" : "#f59e0b"
+              color: result.avgCN >= 25 && result.avgCN <= 30 ? "#059669" : "#2563eb"
             }]}>
               {result.avgCN >= 25 && result.avgCN <= 30 ? "✓ Ideal range" : `⚠ ${result.cnStatus}`}
             </Text>
           </View>
 
           <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: "#ede9fe" }]}>
-              <MaterialCommunityIcons name="weather-windy" size={22} color="#7c3aed" />
+            <View style={[styles.metricIcon, { backgroundColor: "#d1fae5" }]}>
+              <MaterialCommunityIcons name="weather-windy" size={22} color="#059669" />
             </View>
             <Text style={styles.metricLabel}>Methane Output</Text>
             <Text style={styles.metricValue}>{result.methane}</Text>
             <Text style={[styles.metricNote, {
-              color: result.methane === "Low" ? "#10b981" : "#dc2626"
+              color: result.methane === "Low" ? "#059669" : "#2563eb"
             }]}>
               {result.methane === "Low" ? "✓ Eco-friendly" : "⚠ High risk"}
             </Text>
           </View>
 
           <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: "#fef3c7" }]}>
-              <Ionicons name="time" size={22} color="#d97706" />
+            <View style={[styles.metricIcon, { backgroundColor: "#dbeafe" }]}>
+              <Ionicons name="time" size={22} color="#2563eb" />
             </View>
             <Text style={styles.metricLabel}>Decomp. Time</Text>
             <Text style={styles.metricValue}>~{result.avgWeeks} weeks</Text>
@@ -151,8 +154,8 @@ export default function HealthScreen() {
             <Text style={styles.cardTitle}>Fetch.ai Agent Suggestions</Text>
           </View>
 
-          <View style={[styles.suggestionCard, { backgroundColor: "#faf5ff", borderColor: "#e9d5ff" }]}>
-            <Text style={styles.suggestionEmoji}>🎯</Text>
+          <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+            <Ionicons name="checkmark-circle" size={24} color="#059669" />
             <View style={styles.suggestionText}>
               <Text style={styles.suggestionTitle}>
                 {result.avgCN >= 25 && result.avgCN <= 30
@@ -169,10 +172,8 @@ export default function HealthScreen() {
             </View>
           </View>
 
-          <View style={[styles.suggestionCard, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]}>
-            <Text style={styles.suggestionEmoji}>
-              {result.avgWeeks <= 8 ? "⚡" : "🐢"}
-            </Text>
+          <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+            <Ionicons name="time" size={24} color="#059669" />
             <View style={styles.suggestionText}>
               <Text style={styles.suggestionTitle}>
                 {result.avgWeeks <= 8 ? "Fast Decomposition" : "Slow Decomposition"}
@@ -186,9 +187,11 @@ export default function HealthScreen() {
           </View>
 
           <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
-            <Text style={styles.suggestionEmoji}>
-              {result.methane === "Low" ? "🌿" : "⚠️"}
-            </Text>
+            <Ionicons
+              name={result.methane === "Low" ? "leaf" : "warning"}
+              size={24}
+              color={result.methane === "Low" ? "#059669" : "#2563eb"}
+            />
             <View style={styles.suggestionText}>
               <Text style={styles.suggestionTitle}>
                 {result.methane === "Low" ? "Low Methane Emissions" : "Methane Warning"}
@@ -210,7 +213,7 @@ export default function HealthScreen() {
             { label: "Decomposition Rate", value: result.decompRate },
             { label: "Environmental Impact", value: result.envImpact },
             { label: "Nutrient Quality", value: result.nutrientQuality },
-          ].map((item) => ({ ...item, color: item.value >= 65 ? "#10b981" : item.value >= 45 ? "#f59e0b" : "#ef4444" })).map((item) => (
+          ].map((item) => ({ ...item, color: item.value >= 65 ? "#059669" : item.value >= 45 ? "#2563eb" : "#6b7280" })).map((item) => (
             <View key={item.label} style={styles.breakdownRow}>
               <View style={styles.breakdownLabelRow}>
                 <Text style={styles.breakdownLabel}>{item.label}</Text>
@@ -221,30 +224,23 @@ export default function HealthScreen() {
           ))}
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* Bottom Button */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bottomBtn} onPress={() => router.push("/pile" as any)}>
-          <Text style={styles.bottomBtnText}>View My Pile</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#f0fdf4" },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { fontSize: 18, color: "#9ca3af" },
+  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
+  emptyText: { fontSize: 18, color: "#6b7280" },
 
   // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
@@ -254,7 +250,7 @@ const styles = StyleSheet.create({
     width: 36, height: 36,
     borderRadius: 18,
     justifyContent: "center", alignItems: "center",
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#e6f4ef",
   },
   headerTitle: { fontSize: 18, fontWeight: "600", color: "#111827" },
 
@@ -268,29 +264,25 @@ const styles = StyleSheet.create({
     padding: 28,
     alignItems: "center",
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
   },
   scoreIconCircle: {
     width: 72, height: 72,
     borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#047857",
     justifyContent: "center", alignItems: "center",
     marginBottom: 12,
   },
-  scoreSubtitle: { fontSize: 15, color: "rgba(255,255,255,0.8)", marginBottom: 8 },
+  scoreSubtitle: { fontSize: 15, color: "#d1fae5", marginBottom: 8 },
   scoreNumber: { fontSize: 72, fontWeight: "bold", color: "#fff", lineHeight: 80 },
   scoreBadge: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#047857",
     paddingHorizontal: 16, paddingVertical: 8,
     borderRadius: 999, marginTop: 8, marginBottom: 16,
   },
   scoreBadgeText: { color: "#fff", fontWeight: "600", fontSize: 14 },
   scoreProgressTrack: {
     width: "100%", height: 10,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#047857",
     borderRadius: 999, overflow: "hidden",
   },
   scoreProgressFill: { height: "100%", backgroundColor: "#fff", borderRadius: 999 },
@@ -301,7 +293,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 16, padding: 16,
     width: "47%",
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   metricIcon: {
     width: 40, height: 40, borderRadius: 12,
@@ -309,20 +300,19 @@ const styles = StyleSheet.create({
   },
   metricLabel: { fontSize: 12, color: "#6b7280", marginBottom: 4 },
   metricValue: { fontSize: 18, fontWeight: "bold", color: "#111827" },
-  metricNote: { fontSize: 11, color: "#10b981", fontWeight: "500", marginTop: 4 },
+  metricNote: { fontSize: 11, color: "#059669", fontWeight: "500", marginTop: 4 },
 
   // Cards
   card: {
     backgroundColor: "#fff",
     borderRadius: 16, padding: 20,
     marginBottom: 16,
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 },
   cardTitle: { fontSize: 16, fontWeight: "600", color: "#111827", marginBottom: 12 },
   agentIcon: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: "#8b5cf6",
+    backgroundColor: "#059669",
     justifyContent: "center", alignItems: "center",
   },
 
@@ -332,7 +322,6 @@ const styles = StyleSheet.create({
     padding: 14, borderRadius: 12,
     borderWidth: 1, marginBottom: 10,
   },
-  suggestionEmoji: { fontSize: 24 },
   suggestionText: { flex: 1 },
   suggestionTitle: { fontSize: 13, fontWeight: "600", color: "#111827", marginBottom: 4 },
   suggestionBody: { fontSize: 13, color: "#374151", lineHeight: 18 },
@@ -350,29 +339,16 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: "100%", borderRadius: 999 },
 
-  // Warning
+  // Warning (unused but kept for safety)
   warningCard: {
     flexDirection: "row", gap: 12,
-    backgroundColor: "#fffbeb",
-    borderWidth: 1, borderColor: "#fde68a",
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1, borderColor: "#bbf7d0",
     borderRadius: 12, padding: 16,
     marginBottom: 16,
   },
   warningText: { flex: 1 },
-  warningTitle: { fontSize: 13, fontWeight: "600", color: "#92400e", marginBottom: 4 },
-  warningBody: { fontSize: 13, color: "#b45309", lineHeight: 18 },
+  warningTitle: { fontSize: 13, fontWeight: "600", color: "#065f46", marginBottom: 4 },
+  warningBody: { fontSize: 13, color: "#059669", lineHeight: 18 },
 
-  // Bottom
-  bottomBar: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    padding: 20,
-    backgroundColor: "rgba(255,255,255,0.95)",
-  },
-  bottomBtn: {
-    backgroundColor: "#059669",
-    paddingVertical: 16, borderRadius: 16,
-    alignItems: "center",
-    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
-  },
-  bottomBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
 });

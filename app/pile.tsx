@@ -1,11 +1,13 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getPile, clearPile, removeFromPile, PileItem } from "../src/pileStore";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function PileScreen() {
   const [pile, setPile] = useState<PileItem[]>([]);
+  const insets = useSafeAreaInsets();
 
   useFocusEffect(useCallback(() => {
     getPile().then(setPile);
@@ -41,7 +43,7 @@ export default function PileScreen() {
     <View style={styles.root}>
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>My Compost Pile</Text>
         {pile.length > 0 && (
           <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
@@ -71,7 +73,7 @@ export default function PileScreen() {
       {/* Empty State */}
       {pile.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={{ fontSize: 64 }}>🪣</Text>
+          <Ionicons name="leaf-outline" size={64} color="#059669" />
           <Text style={styles.emptyTitle}>Your pile is empty</Text>
           <Text style={styles.emptySubtext}>
             Scan compostable items and tap{"\n"}"Add to My Compost Pile" to get started!
@@ -89,7 +91,7 @@ export default function PileScreen() {
 
               {/* Icon */}
               <View style={styles.itemIcon}>
-                <Text style={{ fontSize: 22 }}>🌱</Text>
+                <Ionicons name="leaf" size={22} color="#059669" />
               </View>
 
               {/* Info */}
@@ -107,10 +109,10 @@ export default function PileScreen() {
                     </Text>
                   </View>
                   <View style={[styles.tag, {
-                    backgroundColor: item.methane === "low" ? "#f0fdf4" : "#fef3c7"
+                    backgroundColor: item.methane === "low" ? "#f0fdf4" : "#dbeafe"
                   }]}>
                     <Text style={[styles.tagText, {
-                      color: item.methane === "low" ? "#166534" : "#92400e"
+                      color: item.methane === "low" ? "#166534" : "#1e40af"
                     }]}>
                       CH₄ {item.methane}
                     </Text>
@@ -144,10 +146,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
   clearBtn: {
-    backgroundColor: "#fee2e2", paddingHorizontal: 12,
+    backgroundColor: "#e6f4ef", paddingHorizontal: 12,
     paddingVertical: 6, borderRadius: 8,
   },
-  clearText: { color: "#dc2626", fontWeight: "600", fontSize: 13 },
+  clearText: { color: "#059669", fontWeight: "600", fontSize: 13 },
 
   statsRow: {
     flexDirection: "row", backgroundColor: "white",
