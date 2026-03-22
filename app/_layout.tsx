@@ -3,7 +3,23 @@ import { Ionicons } from "@expo/vector-icons";
 
 export default function RootLayout() {
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: "#059669", headerShown: false }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: "#059669",
+        tabBarInactiveTintColor: "#9ca3af",
+        tabBarStyle: {
+          backgroundColor: "white",
+          borderTopColor: "#f3f4f6",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          elevation: 12,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{

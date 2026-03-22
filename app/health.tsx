@@ -1,9 +1,11 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ImageBackground } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { getPile, PileItem } from "../src/pileStore";
+
+const AGENT_URL = "https://adrianna-intercrural-behaviorally.ngrok-free.dev/analyze";
 
 function calculateHealth(items: PileItem[]) {
   if (items.length === 0) return null;
@@ -15,7 +17,6 @@ function calculateHealth(items: PileItem[]) {
   const cnScore = Math.max(0, 100 - Math.abs(avgCN - 27.5) * 2.5);
   const methaneScore = (lowMethaneCount / items.length) * 100;
   const decompScore = Math.max(0, 100 - Math.max(0, avgWeeks - 8) * 5);
-
   const score = Math.round(cnScore * 0.6 + methaneScore * 0.25 + decompScore * 0.15);
 
   let status = "";
@@ -50,8 +51,6 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
     </View>
   );
 }
-
-const AGENT_URL = "https://adrianna-intercrural-behaviorally.ngrok-free.dev/analyze";
 
 export default function HealthScreen() {
   const router = useRouter();
@@ -105,14 +104,11 @@ export default function HealthScreen() {
           method: "POST",
           headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
           body: JSON.stringify({
-            items: pile.map((i) => ({
-              item: i.item,
-              cn_ratio: i.cn_ratio,
-              decomp_weeks: i.decomp_weeks,
-              methane: i.methane,
+            items: pile.map(i => ({
+              item: i.item, cn_ratio: i.cn_ratio, decomp_weeks: i.decomp_weeks, methane: i.methane,
             })),
           }),
-        }).then((r) => r.json()),
+        }).then(r => r.json()),
         timeout,
       ]);
       if (data?.improvements) {
@@ -138,9 +134,26 @@ export default function HealthScreen() {
     );
   }
 
+  const breakdownItems = [
+    { label: "Material Balance", value: result.materialBalance },
+    { label: "Decomposition Rate", value: result.decompRate },
+    { label: "Environmental Impact", value: result.envImpact },
+    { label: "Nutrient Quality", value: result.nutrientQuality },
+  ].map(item => ({
+    ...item,
+    color: item.value >= 65 ? "#059669" : item.value >= 45 ? "#2563eb" : "#6b7280",
+  }));
+
   return (
     <View style={styles.root}>
-      {/* Header */}
+
+      <ImageBackground
+        source={require("../assets/images/flowers.jpg")}
+        style={StyleSheet.absoluteFill}
+        imageStyle={{ opacity: 0.23 }}
+        resizeMode="cover"
+      />
+
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#374151" />
@@ -152,6 +165,14 @@ export default function HealthScreen() {
 
         {/* Health Score Card */}
         <View style={styles.scoreCard}>
+          <View style={styles.ringOuter} pointerEvents="none" />
+          <View style={styles.ringMiddle} pointerEvents="none" />
+          <View style={styles.ringInner} pointerEvents="none" />
+          <View style={[styles.dot, { top: 18, right: 28 }]} pointerEvents="none" />
+          <View style={[styles.dot, { top: 40, right: 52, width: 6, height: 6, opacity: 0.2 }]} pointerEvents="none" />
+          <View style={[styles.dot, { bottom: 24, left: 24, width: 8, height: 8, opacity: 0.15 }]} pointerEvents="none" />
+          <View style={[styles.dot, { bottom: 44, left: 48, width: 5, height: 5, opacity: 0.2 }]} pointerEvents="none" />
+
           <View style={styles.scoreIconCircle}>
             <Ionicons name="trending-up" size={36} color="#fff" />
           </View>
@@ -183,7 +204,7 @@ export default function HealthScreen() {
             <Text style={styles.metricLabel}>C:N Ratio</Text>
             <Text style={styles.metricValue}>{result.avgCN}:1</Text>
             <Text style={[styles.metricNote, {
-              color: result.avgCN >= 25 && result.avgCN <= 30 ? "#059669" : "#2563eb"
+              color: result.avgCN >= 25 && result.avgCN <= 30 ? "#059669" : "#2563eb",
             }]}>
               {result.avgCN >= 25 && result.avgCN <= 30 ? "✓ Ideal range" : `⚠ ${result.cnStatus}`}
             </Text>
@@ -195,9 +216,7 @@ export default function HealthScreen() {
             </View>
             <Text style={styles.metricLabel}>Methane Output</Text>
             <Text style={styles.metricValue}>{result.methane}</Text>
-            <Text style={[styles.metricNote, {
-              color: result.methane === "Low" ? "#059669" : "#2563eb"
-            }]}>
+            <Text style={[styles.metricNote, { color: result.methane === "Low" ? "#059669" : "#2563eb" }]}>
               {result.methane === "Low" ? "✓ Eco-friendly" : "⚠ High risk"}
             </Text>
           </View>
@@ -240,7 +259,7 @@ export default function HealthScreen() {
             <Text style={[styles.suggestionBody, { color: "#6b7280" }]}>Analyzing your pile...</Text>
           )}
 
-          {agentTips !== null && (agentTips).map((tip, i) => (
+          {agentTips !== null && agentTips.map((tip, i) => (
             <View key={i} style={[styles.suggestionCard, {
               backgroundColor: isLive ? "#f0fdf4" : "#f9fafb",
               borderColor: isLive ? "#bbf7d0" : "#e5e7eb",
@@ -256,12 +275,7 @@ export default function HealthScreen() {
         {/* Health Breakdown */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Health Breakdown</Text>
-          {[
-            { label: "Material Balance", value: result.materialBalance },
-            { label: "Decomposition Rate", value: result.decompRate },
-            { label: "Environmental Impact", value: result.envImpact },
-            { label: "Nutrient Quality", value: result.nutrientQuality },
-          ].map((item) => ({ ...item, color: item.value >= 65 ? "#059669" : item.value >= 45 ? "#2563eb" : "#6b7280" })).map((item) => (
+          {breakdownItems.map(item => (
             <View key={item.label} style={styles.breakdownRow}>
               <View style={styles.breakdownLabelRow}>
                 <Text style={styles.breakdownLabel}>{item.label}</Text>
@@ -283,121 +297,89 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   emptyText: { fontSize: 18, color: "#6b7280" },
 
-  // Header
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 14,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 4,
   },
   backBtn: {
-    width: 36, height: 36,
-    borderRadius: 18,
-    justifyContent: "center", alignItems: "center",
-    backgroundColor: "#e6f4ef",
+    width: 36, height: 36, borderRadius: 18,
+    justifyContent: "center", alignItems: "center", backgroundColor: "#e6f4ef",
   },
   headerTitle: { fontSize: 18, fontWeight: "600", color: "#111827" },
 
   scroll: { flex: 1 },
   scrollContent: { padding: 20 },
 
-  // Score Card
   scoreCard: {
-    backgroundColor: "#059669",
-    borderRadius: 24,
-    padding: 28,
-    alignItems: "center",
-    marginBottom: 16,
+    backgroundColor: "#059669", borderRadius: 24, padding: 28,
+    alignItems: "center", marginBottom: 16, overflow: "hidden",
+    shadowColor: "#059669", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8,
+  },
+  ringOuter: {
+    position: "absolute", width: 260, height: 260, borderRadius: 130,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", top: -80, right: -60,
+  },
+  ringMiddle: {
+    position: "absolute", width: 180, height: 180, borderRadius: 90,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", top: -40, right: -20,
+  },
+  ringInner: {
+    position: "absolute", width: 100, height: 100, borderRadius: 50,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", top: -10, right: 20,
+  },
+  dot: {
+    position: "absolute", width: 10, height: 10, borderRadius: 5,
+    backgroundColor: "white", opacity: 0.25,
   },
   scoreIconCircle: {
-    width: 72, height: 72,
-    borderRadius: 36,
-    backgroundColor: "#047857",
-    justifyContent: "center", alignItems: "center",
-    marginBottom: 12,
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: "#047857", justifyContent: "center", alignItems: "center", marginBottom: 12,
   },
   scoreSubtitle: { fontSize: 15, color: "#d1fae5", marginBottom: 8 },
   scoreNumber: { fontSize: 72, fontWeight: "bold", color: "#fff", lineHeight: 80 },
   scoreBadge: {
-    backgroundColor: "#047857",
-    paddingHorizontal: 16, paddingVertical: 8,
+    backgroundColor: "#047857", paddingHorizontal: 16, paddingVertical: 8,
     borderRadius: 999, marginTop: 8, marginBottom: 16,
   },
   scoreBadgeText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  scoreProgressTrack: {
-    width: "100%", height: 10,
-    backgroundColor: "#047857",
-    borderRadius: 999, overflow: "hidden",
-  },
+  scoreProgressTrack: { width: "100%", height: 10, backgroundColor: "#047857", borderRadius: 999, overflow: "hidden" },
   scoreProgressFill: { height: "100%", backgroundColor: "#fff", borderRadius: 999 },
 
-  // Grid
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 16 },
   metricCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16, padding: 16,
-    width: "47%",
+    backgroundColor: "#fff", borderRadius: 16, padding: 16, width: "47%",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.14, shadowRadius: 16, elevation: 8,
   },
-  metricIcon: {
-    width: 40, height: 40, borderRadius: 12,
-    justifyContent: "center", alignItems: "center", marginBottom: 10,
-  },
+  metricIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center", marginBottom: 10 },
   metricLabel: { fontSize: 12, color: "#6b7280", marginBottom: 4 },
   metricValue: { fontSize: 18, fontWeight: "bold", color: "#111827" },
-  metricNote: { fontSize: 11, color: "#059669", fontWeight: "500", marginTop: 4 },
+  metricNote: { fontSize: 11, fontWeight: "500", marginTop: 4 },
 
-  // Cards
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 16, padding: 20,
-    marginBottom: 16,
+    backgroundColor: "#fff", borderRadius: 16, padding: 20, marginBottom: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.14, shadowRadius: 16, elevation: 8,
   },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 },
   cardTitle: { fontSize: 16, fontWeight: "600", color: "#111827", marginBottom: 12 },
   agentIcon: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: "#059669",
-    justifyContent: "center", alignItems: "center",
+    backgroundColor: "#059669", justifyContent: "center", alignItems: "center",
   },
 
-  // Suggestions
   suggestionCard: {
-    flexDirection: "row", gap: 12,
-    padding: 14, borderRadius: 12,
-    borderWidth: 1, marginBottom: 10,
+    flexDirection: "row", gap: 12, alignItems: "flex-start",
+    padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 10,
   },
   suggestionText: { flex: 1 },
-  suggestionTitle: { fontSize: 13, fontWeight: "600", color: "#111827", marginBottom: 4 },
   suggestionBody: { fontSize: 13, color: "#374151", lineHeight: 18 },
 
-  // Breakdown
   breakdownRow: { marginBottom: 14 },
-  breakdownLabelRow: {
-    flexDirection: "row", justifyContent: "space-between", marginBottom: 6,
-  },
+  breakdownLabelRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
   breakdownLabel: { fontSize: 13, color: "#374151" },
   breakdownValue: { fontSize: 13, fontWeight: "600" },
-  progressTrack: {
-    width: "100%", height: 8,
-    backgroundColor: "#e5e7eb", borderRadius: 999, overflow: "hidden",
-  },
+  progressTrack: { width: "100%", height: 8, backgroundColor: "#e5e7eb", borderRadius: 999, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 999 },
-
-  // Warning (unused but kept for safety)
-  warningCard: {
-    flexDirection: "row", gap: 12,
-    backgroundColor: "#f0fdf4",
-    borderWidth: 1, borderColor: "#bbf7d0",
-    borderRadius: 12, padding: 16,
-    marginBottom: 16,
-  },
-  warningText: { flex: 1 },
-  warningTitle: { fontSize: 13, fontWeight: "600", color: "#065f46", marginBottom: 4 },
-  warningBody: { fontSize: 13, color: "#059669", lineHeight: 18 },
 
   liveBadge: { marginLeft: "auto", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   liveBadgeText: { fontSize: 11, fontWeight: "600" },
@@ -405,7 +387,7 @@ const styles = StyleSheet.create({
   generateBtn: {
     backgroundColor: "#059669", borderRadius: 10,
     paddingVertical: 12, alignItems: "center", marginTop: 4,
+    shadowColor: "#059669", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   generateBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-
 });
