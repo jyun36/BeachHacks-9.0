@@ -107,7 +107,7 @@ export default function HealthScreen() {
     setAgentTips(null);
     try {
       const timeout = new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 4000)
+        setTimeout(() => reject(new Error("timeout")), 10000)
       );
       const data: any = await Promise.race([
         fetch(AGENT_URL, {
