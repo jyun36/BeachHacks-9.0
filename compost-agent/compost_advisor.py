@@ -30,44 +30,49 @@ def get_status(avg_cn: float) -> str:
     if avg_cn <= 60:  return "Slightly Carbon-Heavy"
     return "Too Carbon-Heavy"
 
-def get_improvements(avg_cn: float, avg_weeks: int, methane: str) -> list:
+def get_improvements(items, avg_cn: float, avg_weeks: int, methane: str) -> list:
     tips = []
+    count = len(items)
+    high_carbon = [i.item for i in items if i.cn_ratio > 40]
+    high_nitrogen = [i.item for i in items if i.cn_ratio < 20]
+    slow_items = [i.item for i in items if i.decomp_weeks > 10]
 
-    # Tip 1: C:N / nitrogen balance
+    # Tip 1: C:N balance — references specific items and real numbers
     if avg_cn < 15:
-        tips.append("Your pile is very nitrogen-heavy. Add cardboard, wood chips, or dry leaves to balance it out.")
+        if high_nitrogen:
+            tips.append(f"Items like {high_nitrogen[0]} are making your pile very nitrogen-heavy (C:N {round(avg_cn)}:1). Add cardboard or wood chips to balance.")
+        else:
+            tips.append(f"C:N ratio of {round(avg_cn)}:1 is too low. Layer in dry brown materials like straw or shredded paper between your greens.")
     elif avg_cn < 25:
-        tips.append("Slightly too much nitrogen. Mix in some dry brown materials like paper or straw to improve balance.")
+        tips.append(f"Your {count}-item pile sits at {round(avg_cn)}:1 — slightly nitrogen-heavy. Add some dry leaves or torn cardboard to push toward the ideal 25-30 range.")
     elif avg_cn <= 30:
-        tips.append("Your C:N ratio is in the ideal range. Keep adding a mix of greens and browns at your current pace.")
+        tips.append(f"Perfect balance — your {count}-item pile has a C:N ratio of {round(avg_cn)}:1, right in the sweet spot. Keep mixing greens and browns at this pace.")
     elif avg_cn <= 60:
-        tips.append("Your pile is slightly carbon-heavy. Add fruit scraps, coffee grounds, or fresh grass clippings.")
+        if high_carbon:
+            tips.append(f"Items like {high_carbon[0]} are pulling your C:N to {round(avg_cn)}:1. Balance them out with fruit scraps, coffee grounds, or fresh grass clippings.")
+        else:
+            tips.append(f"C:N of {round(avg_cn)}:1 is carbon-heavy across your {count} items. Add nitrogen-rich scraps like vegetable peels or banana skins.")
     else:
-        tips.append("Too much carbon in your pile. Add nitrogen-rich materials like vegetable scraps or manure.")
+        tips.append(f"C:N ratio of {round(avg_cn)}:1 is too carbon-heavy. Your pile needs significantly more nitrogen — add food scraps, grass clippings, or coffee grounds daily.")
 
-    # Tip 2: Decomposition speed
+    # Tip 2: Decomposition — references slow items by name
     if avg_weeks <= 4:
-        tips.append("Great decomposition rate! Your pile is breaking down quickly. Keep moisture consistent.")
+        tips.append(f"Excellent decomp rate — your pile should be ready in ~{avg_weeks} weeks. Turn it every 3 days to keep oxygen flowing.")
     elif avg_weeks <= 8:
-        tips.append("Decomposition is on track. Turn your pile every 3-4 days to maintain airflow and speed things up.")
+        if slow_items:
+            tips.append(f"{slow_items[0].capitalize()} is slowing things down. Chop it into smaller pieces to cut your estimated {avg_weeks}-week timeline significantly.")
+        else:
+            tips.append(f"Estimated ~{avg_weeks} weeks to compost. Turn the pile every 3-4 days and keep moisture consistent to speed things up.")
     else:
-        tips.append("Decomposition is slow. Chop items into smaller pieces and add water if the pile feels dry.")
+        tips.append(f"At ~{avg_weeks} weeks your decomposition is slow. Break larger items into pieces, add a nitrogen boost, and turn the pile more frequently.")
 
     # Tip 3: Methane / aeration
     if methane == "Low":
-        tips.append("Low methane output — your pile is aerobic and eco-friendly. Keep turning it regularly.")
+        tips.append(f"Low methane across all {count} items — your pile is aerobic and eco-friendly. Maintain airflow by turning it regularly.")
     elif methane == "Medium":
-        tips.append("Moderate methane detected. Increase aeration by turning your pile more frequently.")
+        tips.append("Moderate methane detected. Add dry carbon materials between layers and turn the pile every 2-3 days to restore aerobic conditions.")
     else:
-        tips.append("High methane risk. Add carbon-rich dry materials and turn the pile every 2 days to reduce emissions.")
-
-    # Tip 4: General optimization based on pile state
-    if avg_cn < 25 and avg_weeks > 6:
-        tips.append("Try layering green and brown materials instead of mixing randomly for faster breakdown.")
-    elif avg_cn > 30 and methane != "Low":
-        tips.append("Shred or tear materials before adding them to maximize surface area and microbial activity.")
-    else:
-        tips.append("Maintain moisture like a wrung-out sponge — not too wet, not too dry — for optimal composting.")
+        tips.append("High methane risk — your pile is going anaerobic. Add dry materials immediately, aerate daily, and avoid compacting the pile.")
 
     return tips
 
@@ -98,7 +103,7 @@ async def analyze(ctx: Context, req: PileRequest) -> PileResponse:
         avg_cn=avg_cn,
         methane=methane,
         decomp_weeks=avg_weeks,
-        improvements=get_improvements(avg_cn, avg_weeks, methane)
+        improvements=get_improvements(req.items, avg_cn, avg_weeks, methane)
     )
 
 @agent.on_event("startup")

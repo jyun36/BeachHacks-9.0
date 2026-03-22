@@ -51,36 +51,74 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-const AGENT_URL = "http://10.39.100.91:8080/analyze";
+const AGENT_URL = "https://adrianna-intercrural-behaviorally.ngrok-free.dev/analyze";
 
 export default function HealthScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [pile, setPile] = useState<PileItem[]>([]);
-  const [agentTips, setAgentTips] = useState<string[]>([]);
+  const [agentTips, setAgentTips] = useState<string[] | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [isLive, setIsLive] = useState(false);
 
   useFocusEffect(useCallback(() => {
-    getPile().then((items) => {
-      setPile(items);
-      if (items.length > 0) {
+    setAgentTips(null);
+    setIsLive(false);
+    getPile().then(setPile);
+  }, []));
+
+  const getFallback = (items: PileItem[], r: ReturnType<typeof calculateHealth>) => {
+    if (!r) return [];
+    return [
+      r.avgCN < 25
+        ? "Nitrogen-heavy pile. Add cardboard or dry leaves."
+        : r.avgCN > 30
+        ? "Carbon-heavy pile. Add fruit scraps or coffee grounds."
+        : "C:N ratio looks good. Keep mixing greens and browns.",
+      r.avgWeeks <= 8
+        ? "Decomposition on track. Turn every 3–4 days."
+        : "Slow decomp. Chop items smaller and keep pile moist.",
+      r.methane === "Low"
+        ? "Low methane — pile is aerobic. Keep turning it."
+        : "High methane risk. Add dry materials and aerate daily.",
+    ];
+  };
+
+  const handleGenerate = async () => {
+    if (pile.length === 0) return;
+    setAgentLoading(true);
+    setAgentTips(null);
+    setIsLive(false);
+    try {
+      const timeout = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 4000)
+      );
+      const data: any = await Promise.race([
         fetch(AGENT_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
           body: JSON.stringify({
-            items: items.map((i) => ({
+            items: pile.map((i) => ({
               item: i.item,
               cn_ratio: i.cn_ratio,
               decomp_weeks: i.decomp_weeks,
               methane: i.methane,
             })),
           }),
-        })
-          .then((r) => r.json())
-          .then((data) => { if (data.improvements) setAgentTips(data.improvements); })
-          .catch(() => {});
+        }).then((r) => r.json()),
+        timeout,
+      ]);
+      if (data?.improvements) {
+        setAgentTips(data.improvements);
+        setIsLive(true);
+      } else {
+        setAgentTips(getFallback(pile, result));
       }
-    });
-  }, []));
+    } catch {
+      setAgentTips(getFallback(pile, result));
+    }
+    setAgentLoading(false);
+  };
 
   const result = calculateHealth(pile);
 
@@ -174,26 +212,33 @@ export default function HealthScreen() {
               <Ionicons name="sparkles" size={18} color="#fff" />
             </View>
             <Text style={styles.cardTitle}>Fetch.ai Agent Suggestions</Text>
+            {agentTips !== null && (
+              <View style={[styles.liveBadge, { backgroundColor: isLive ? "#d1fae5" : "#e5e7eb" }]}>
+                <Text style={[styles.liveBadgeText, { color: isLive ? "#059669" : "#6b7280" }]}>
+                  {isLive ? "● Live" : "● Offline"}
+                </Text>
+              </View>
+            )}
           </View>
 
-          {(agentTips.length > 0 ? agentTips : [
-            result.avgCN < 25
-              ? "Your pile is nitrogen-heavy. Add cardboard, dry leaves, or wood chips to balance it."
-              : result.avgCN > 30
-              ? "Your pile needs more nitrogen. Add fruit scraps, grass clippings, or coffee grounds."
-              : "Your C:N ratio is in the ideal range. Keep adding a mix of greens and browns.",
-            result.avgWeeks <= 4
-              ? "Great decomposition rate! Keep moisture consistent."
-              : result.avgWeeks <= 8
-              ? "Decomposition is on track. Turn your pile every 3–4 days to maintain airflow."
-              : "Decomposition is slow. Chop items smaller and water the pile if it feels dry.",
-            result.methane === "Low"
-              ? "Low methane output — your pile is aerobic and eco-friendly. Keep turning it regularly."
-              : "High methane risk. Add carbon-rich dry materials and turn the pile every 2 days.",
-            "Maintain moisture like a wrung-out sponge — not too wet, not too dry — for optimal composting.",
-          ]).map((tip, i) => (
-            <View key={i} style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
-              <Ionicons name="checkmark-circle" size={24} color="#059669" />
+          {agentTips === null && !agentLoading && (
+            pile.length === 0
+              ? <Text style={styles.suggestionBody}>Add items to your pile first.</Text>
+              : <TouchableOpacity style={styles.generateBtn} onPress={handleGenerate}>
+                  <Text style={styles.generateBtnText}>Generate Suggestions</Text>
+                </TouchableOpacity>
+          )}
+
+          {agentLoading && (
+            <Text style={[styles.suggestionBody, { color: "#6b7280" }]}>Analyzing your pile...</Text>
+          )}
+
+          {agentTips !== null && (agentTips).map((tip, i) => (
+            <View key={i} style={[styles.suggestionCard, {
+              backgroundColor: isLive ? "#f0fdf4" : "#f9fafb",
+              borderColor: isLive ? "#bbf7d0" : "#e5e7eb",
+            }]}>
+              <Ionicons name="checkmark-circle" size={24} color={isLive ? "#059669" : "#9ca3af"} />
               <View style={styles.suggestionText}>
                 <Text style={styles.suggestionBody}>{tip}</Text>
               </View>
@@ -346,5 +391,14 @@ const styles = StyleSheet.create({
   warningText: { flex: 1 },
   warningTitle: { fontSize: 13, fontWeight: "600", color: "#065f46", marginBottom: 4 },
   warningBody: { fontSize: 13, color: "#059669", lineHeight: 18 },
+
+  liveBadge: { marginLeft: "auto", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  liveBadgeText: { fontSize: 11, fontWeight: "600" },
+
+  generateBtn: {
+    backgroundColor: "#059669", borderRadius: 10,
+    paddingVertical: 12, alignItems: "center", marginTop: 4,
+  },
+  generateBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 
 });
