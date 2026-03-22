@@ -1,6 +1,6 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ImageBackground } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ImageBackground, Animated } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { getPile, PileItem } from "../src/pileStore";
@@ -58,8 +58,8 @@ export default function HealthScreen() {
   const [pile, setPile] = useState<PileItem[]>([]);
   const [agentTips, setAgentTips] = useState<string[] | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
-
   const [lastPileIds, setLastPileIds] = useState<string>("");
+  const decompAnim = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(useCallback(() => {
     getPile().then((items) => {
@@ -71,6 +71,18 @@ export default function HealthScreen() {
       setPile(items);
     });
   }, [lastPileIds]));
+
+  const result = calculateHealth(pile);
+
+  useEffect(() => {
+    if (!result) return;
+    const pct = Math.min(100, Math.max(0, 100 - (result.avgWeeks / 16) * 100));
+    Animated.timing(decompAnim, {
+      toValue: pct,
+      duration: 900,
+      useNativeDriver: false,
+    }).start();
+  }, [result?.avgWeeks]);
 
   const getFallback = (items: PileItem[], r: ReturnType<typeof calculateHealth>) => {
     if (!r) return [];
@@ -122,8 +134,6 @@ export default function HealthScreen() {
     }
     setAgentLoading(false);
   };
-
-  const result = calculateHealth(pile);
 
   if (!result) {
     return (
@@ -221,13 +231,30 @@ export default function HealthScreen() {
             </Text>
           </View>
 
+          {/* Animated Decomp Card */}
           <View style={styles.metricCard}>
             <View style={[styles.metricIcon, { backgroundColor: "#dbeafe" }]}>
               <Ionicons name="time" size={22} color="#2563eb" />
             </View>
             <Text style={styles.metricLabel}>Decomp. Time</Text>
             <Text style={styles.metricValue}>~{result.avgWeeks} weeks</Text>
-            <Text style={styles.metricNote}>Average</Text>
+            <View style={styles.progressTrack}>
+              <Animated.View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: "#2563eb",
+                    width: decompAnim.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ["0%", "100%"],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.metricNote}>
+              {result.avgWeeks <= 4 ? "🔥 Fast decomposer" : result.avgWeeks <= 8 ? "⏳ On track" : "🐢 Slow — chop items smaller"}
+            </Text>
           </View>
         </View>
 
