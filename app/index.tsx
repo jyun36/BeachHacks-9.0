@@ -2,16 +2,22 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useFocusEffect } from "expo-router";
 import { Text, View, TouchableOpacity, Modal, Animated, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { analyzeItem } from "../src/gemini";
-import { addToPile } from "../src/pileStore";
+import { addToPile, getPile } from "../src/pileStore";
 
 export default function Index() {
   const [permission, requestPermission] = useCameraPermissions();
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [compostCount, setCompostCount] = useState(0);
+  const [scoreImproved, setScoreImproved] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const loadingAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
 
   useEffect(() => {
     if (loading) {
@@ -37,6 +43,7 @@ export default function Index() {
       const analysis = await analyzeItem(photo.uri);
       setResult(analysis);
       setShowModal(true);
+      setScanCount(c => c + 1);
     } catch (e) {
       console.error(e);
     }
@@ -52,6 +59,18 @@ export default function Index() {
         methane: result.methane,
         reason: result.reason,
       });
+      setCompostCount(c => c + 1);
+      const pile = await getPile();
+      if (pile.length > 0) {
+        const avgCN = pile.reduce((s, i) => s + i.cn_ratio, 0) / pile.length;
+        const avgWeeks = pile.reduce((s, i) => s + i.decomp_weeks, 0) / pile.length;
+        const lowMethane = pile.filter(i => i.methane === "low").length;
+        const cnScore = Math.max(0, 100 - Math.abs(avgCN - 27.5) * 2.5);
+        const methaneScore = (lowMethane / pile.length) * 100;
+        const decompScore = Math.max(0, 100 - Math.max(0, avgWeeks - 8) * 5);
+        const score = Math.round(cnScore * 0.6 + methaneScore * 0.25 + decompScore * 0.15);
+        if (score >= 90) setScoreImproved(true);
+      }
     }
     setShowModal(false);
     setResult(null);
@@ -79,7 +98,23 @@ export default function Index() {
     );
   }
 
+  const toggleTasks = (open: boolean) => {
+    setShowTasks(open);
+    Animated.spring(slideAnim, {
+      toValue: open ? 0 : 300,
+      useNativeDriver: true,
+      bounciness: 6,
+    }).start();
+  };
+
   const barWidth = loadingAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+
+  const tasks = [
+    { label: "Take 5 scans", current: Math.min(scanCount, 5), goal: 5, done: scanCount >= 5 },
+    { label: "Compost 3 items", current: Math.min(compostCount, 3), goal: 3, done: compostCount >= 3 },
+    { label: "Reach a score of 90", current: scoreImproved ? 1 : 0, goal: 1, done: scoreImproved },
+  ];
+  const completedCount = tasks.filter(t => t.done).length;
 
   return (
     <View style={styles.root}>
@@ -93,6 +128,19 @@ export default function Index() {
           <View style={[styles.corner, styles.bottomLeft]} />
           <View style={[styles.corner, styles.bottomRight]} />
         </View>
+      </View>
+
+      {/* Daily Tasks button — top left */}
+      <View style={styles.tasksButtonContainer}>
+        <TouchableOpacity onPress={() => toggleTasks(!showTasks)} style={styles.tasksButton}>
+          <Ionicons name="leaf" size={20} color="white" />
+          {completedCount > 0 && (
+            <View style={styles.tasksBadge}>
+              <Text style={styles.tasksBadgeText}>{completedCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
       </View>
 
       {/* Centered loading bar */}
@@ -112,6 +160,29 @@ export default function Index() {
           style={[styles.shutter, loading && styles.shutterDisabled]}
         />
       </View>
+
+      {/* Daily Tasks bottom sheet */}
+      {showTasks && (
+        <TouchableOpacity style={styles.tasksBackdrop} activeOpacity={1} onPress={() => toggleTasks(false)} />
+      )}
+      <Animated.View style={[styles.tasksSheet, { transform: [{ translateY: slideAnim }] }]}>
+        <View style={styles.tasksHandle} />
+        <Text style={styles.tasksPanelTitle}>Daily Tasks</Text>
+        {tasks.map((task, i) => (
+          <View key={i} style={styles.taskRow}>
+            <View style={[styles.taskCheck, task.done && styles.taskCheckDone]}>
+              <Ionicons name="checkmark-circle" size={26} color={task.done ? "#059669" : "#d1d5db"} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.taskLabel, task.done && styles.taskLabelDone]}>{task.label}</Text>
+              <View style={styles.taskTrack}>
+                <View style={[styles.taskFill, { width: `${(task.current / task.goal) * 100}%` as any }]} />
+              </View>
+              <Text style={styles.taskProgress}>{task.current}/{task.goal}</Text>
+            </View>
+          </View>
+        ))}
+      </Animated.View>
 
       {/* Result Modal */}
       <Modal visible={showModal} transparent animationType="slide">
@@ -171,6 +242,47 @@ const styles = StyleSheet.create({
   topRight: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 4 },
   bottomLeft: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 4 },
   bottomRight: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 4 },
+
+  // Daily tasks
+  tasksButtonContainer: { position: "absolute", top: 60, left: 16 },
+  tasksButton: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: "#059669",
+    justifyContent: "center", alignItems: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 6,
+  },
+  tasksBadge: {
+    position: "absolute", top: -4, right: -4,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: "#fbbf24", justifyContent: "center", alignItems: "center",
+  },
+  tasksBadgeText: { fontSize: 10, fontWeight: "700", color: "#111827" },
+  tasksBackdrop: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+  },
+  tasksSheet: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+    shadowColor: "#000", shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 24,
+  },
+  tasksHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: "#d1d5db", alignSelf: "center", marginBottom: 20,
+  },
+  tasksPanelTitle: { color: "#111827", fontWeight: "700", fontSize: 16, marginBottom: 16 },
+  taskRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 12 },
+  taskCheck: { justifyContent: "center", alignItems: "center", marginTop: 1, marginRight: 2 },
+  taskCheckDone: {},
+  taskLabel: { color: "#111827", fontSize: 13, fontWeight: "500", marginBottom: 4 },
+  taskLabelDone: { color: "#059669", textDecorationLine: "line-through" },
+  taskTrack: {
+    width: "100%", height: 5,
+    backgroundColor: "#e5e7eb",
+    borderRadius: 999, overflow: "hidden",
+  },
+  taskFill: { height: "100%", backgroundColor: "#059669", borderRadius: 999 },
+  taskProgress: { color: "#9ca3af", fontSize: 11, marginTop: 3 },
 
   loadingOverlay: {
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
