@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { Text, View, TouchableOpacity, Image, ScrollView, Modal } from "react-native";
-import { analyzeItem } from "./gemini";
+import { analyzeItem } from "../src/gemini";
 
 export default function Index() {
   const [permission, requestPermission] = useCameraPermissions();
