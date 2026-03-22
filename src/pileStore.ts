@@ -12,6 +12,9 @@ export type PileItem = {
 
 const KEY = "compost_pile";
 
+// Clear pile on app start
+AsyncStorage.removeItem(KEY).catch(() => {});
+
 // Get all items in the pile
 export async function getPile(): Promise<PileItem[]> {
   try {

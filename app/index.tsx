@@ -1,5 +1,6 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import { Text, View, TouchableOpacity, Modal } from "react-native";
 import { analyzeItem } from "../src/gemini";
 import { addToPile } from "../src/pileStore";
@@ -41,6 +42,10 @@ setResult(null);
     }
     setShowModal(false);
   };
+
+  useFocusEffect(useCallback(() => {
+    return () => setResult(null);
+  }, []));
 
   const handleDismiss = () => {
     setShowModal(false);
