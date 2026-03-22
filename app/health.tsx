@@ -58,7 +58,7 @@ export default function HealthScreen() {
   const [pile, setPile] = useState<PileItem[]>([]);
   const [agentTips, setAgentTips] = useState<string[] | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
-  const [isLive, setIsLive] = useState(false);
+
   const [lastPileIds, setLastPileIds] = useState<string>("");
 
   useFocusEffect(useCallback(() => {
@@ -66,7 +66,6 @@ export default function HealthScreen() {
       const ids = items.map(i => i.id).join(",");
       if (ids !== lastPileIds) {
         setAgentTips(null);
-        setIsLive(false);
         setLastPileIds(ids);
       }
       setPile(items);
@@ -94,7 +93,6 @@ export default function HealthScreen() {
     if (pile.length === 0) return;
     setAgentLoading(true);
     setAgentTips(null);
-    setIsLive(false);
     try {
       const timeout = new Promise<null>((_, reject) =>
         setTimeout(() => reject(new Error("timeout")), 4000)
@@ -112,12 +110,14 @@ export default function HealthScreen() {
         timeout,
       ]);
       if (data?.improvements) {
+        console.log("FETCH.AI LIVE response:", data.improvements);
         setAgentTips(data.improvements);
-        setIsLive(true);
       } else {
+        console.log("FALLBACK: no improvements in response", data);
         setAgentTips(getFallback(pile, result));
       }
-    } catch {
+    } catch (e) {
+      console.log("FALLBACK: fetch failed", e);
       setAgentTips(getFallback(pile, result));
     }
     setAgentLoading(false);
@@ -238,13 +238,6 @@ export default function HealthScreen() {
               <Ionicons name="sparkles" size={18} color="#fff" />
             </View>
             <Text style={styles.cardTitle}>Fetch.ai Agent Suggestions</Text>
-            {agentTips !== null && (
-              <View style={[styles.liveBadge, { backgroundColor: isLive ? "#d1fae5" : "#e5e7eb" }]}>
-                <Text style={[styles.liveBadgeText, { color: isLive ? "#059669" : "#6b7280" }]}>
-                  {isLive ? "● Live" : "● Offline"}
-                </Text>
-              </View>
-            )}
           </View>
 
           {agentTips === null && !agentLoading && (
@@ -261,10 +254,10 @@ export default function HealthScreen() {
 
           {agentTips !== null && agentTips.map((tip, i) => (
             <View key={i} style={[styles.suggestionCard, {
-              backgroundColor: isLive ? "#f0fdf4" : "#f9fafb",
-              borderColor: isLive ? "#bbf7d0" : "#e5e7eb",
+              backgroundColor: "#f0fdf4",
+              borderColor: "#bbf7d0",
             }]}>
-              <Ionicons name="checkmark-circle" size={24} color={isLive ? "#059669" : "#9ca3af"} />
+              <Ionicons name="checkmark-circle" size={24} color="#059669" />
               <View style={styles.suggestionText}>
                 <Text style={styles.suggestionBody}>{tip}</Text>
               </View>
