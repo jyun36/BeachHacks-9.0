@@ -51,13 +51,35 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
   );
 }
 
+const AGENT_URL = "http://10.39.100.91:8080/analyze";
+
 export default function HealthScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [pile, setPile] = useState<PileItem[]>([]);
+  const [agentTips, setAgentTips] = useState<string[]>([]);
 
   useFocusEffect(useCallback(() => {
-    getPile().then(setPile);
+    getPile().then((items) => {
+      setPile(items);
+      if (items.length > 0) {
+        fetch(AGENT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: items.map((i) => ({
+              item: i.item,
+              cn_ratio: i.cn_ratio,
+              decomp_weeks: i.decomp_weeks,
+              methane: i.methane,
+            })),
+          }),
+        })
+          .then((r) => r.json())
+          .then((data) => { if (data.improvements) setAgentTips(data.improvements); })
+          .catch(() => {});
+      }
+    });
   }, []));
 
   const result = calculateHealth(pile);
@@ -154,55 +176,29 @@ export default function HealthScreen() {
             <Text style={styles.cardTitle}>Fetch.ai Agent Suggestions</Text>
           </View>
 
-          <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
-            <Ionicons name="checkmark-circle" size={24} color="#059669" />
-            <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle}>
-                {result.avgCN >= 25 && result.avgCN <= 30
-                  ? "Perfect Balance"
-                  : result.avgCN < 25 ? "Add Carbon Materials" : "Add Nitrogen Materials"}
-              </Text>
-              <Text style={styles.suggestionBody}>
-                {result.avgCN >= 25 && result.avgCN <= 30
-                  ? "Your C:N ratio is excellent! Keep adding materials at your current pace."
-                  : result.avgCN < 25
-                  ? "Your pile is nitrogen-heavy. Add cardboard, dry leaves, or wood chips to balance it."
-                  : "Your pile needs more nitrogen. Add fruit scraps, grass clippings, or coffee grounds."}
-              </Text>
+          {(agentTips.length > 0 ? agentTips : [
+            result.avgCN < 25
+              ? "Your pile is nitrogen-heavy. Add cardboard, dry leaves, or wood chips to balance it."
+              : result.avgCN > 30
+              ? "Your pile needs more nitrogen. Add fruit scraps, grass clippings, or coffee grounds."
+              : "Your C:N ratio is in the ideal range. Keep adding a mix of greens and browns.",
+            result.avgWeeks <= 4
+              ? "Great decomposition rate! Keep moisture consistent."
+              : result.avgWeeks <= 8
+              ? "Decomposition is on track. Turn your pile every 3–4 days to maintain airflow."
+              : "Decomposition is slow. Chop items smaller and water the pile if it feels dry.",
+            result.methane === "Low"
+              ? "Low methane output — your pile is aerobic and eco-friendly. Keep turning it regularly."
+              : "High methane risk. Add carbon-rich dry materials and turn the pile every 2 days.",
+            "Maintain moisture like a wrung-out sponge — not too wet, not too dry — for optimal composting.",
+          ]).map((tip, i) => (
+            <View key={i} style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+              <Ionicons name="checkmark-circle" size={24} color="#059669" />
+              <View style={styles.suggestionText}>
+                <Text style={styles.suggestionBody}>{tip}</Text>
+              </View>
             </View>
-          </View>
-
-          <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
-            <Ionicons name="time" size={24} color="#059669" />
-            <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle}>
-                {result.avgWeeks <= 8 ? "Fast Decomposition" : "Slow Decomposition"}
-              </Text>
-              <Text style={styles.suggestionBody}>
-                {result.avgWeeks <= 8
-                  ? `Estimated ~${result.avgWeeks} weeks to compost. Turn your pile every 3–4 days to maintain moisture.`
-                  : `Estimated ~${result.avgWeeks} weeks. Chop items smaller and add nitrogen-rich materials to speed things up.`}
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
-            <Ionicons
-              name={result.methane === "Low" ? "leaf" : "warning"}
-              size={24}
-              color={result.methane === "Low" ? "#059669" : "#2563eb"}
-            />
-            <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle}>
-                {result.methane === "Low" ? "Low Methane Emissions" : "Methane Warning"}
-              </Text>
-              <Text style={styles.suggestionBody}>
-                {result.methane === "Low"
-                  ? "Your pile is aerobic and eco-friendly. Keep turning it regularly to maintain airflow."
-                  : "High methane risk detected. Add more carbon-rich dry materials and turn your pile more frequently."}
-              </Text>
-            </View>
-          </View>
+          ))}
         </View>
 
         {/* Health Breakdown */}
