@@ -1,45 +1,16 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { getAvgCN, getHealthScore, getPile } from "./pileStore";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useState } from "react";
 
-// Fake pile data — Person 2 will replace this with real shared data
-const fakePile = [
-  { name: "Apple core", cn: 15 },
-  { name: "Cardboard", cn: 350 },
-  { name: "Grass clippings", cn: 20 },
-  { name: "Coffee grounds", cn: 20 },
-  { name: "Dry leaves", cn: 60 },
-];
-
-function calculateHealth(items: { name: string; cn: number }[]) {
-  if (items.length === 0) return null;
-  const avgCN = items.reduce((sum, i) => sum + i.cn, 0) / items.length;
-  const ideal = 27.5;
-  const diff = Math.abs(avgCN - ideal);
-  const score = Math.max(0, Math.round(100 - diff * 1.5));
-
-  let status = "";
-  let methane = "";
-
-  if (avgCN < 15) {
-    status = "Too Nitrogen-Heavy";
-    methane = "High";
-  } else if (avgCN < 25) {
-    status = "Slightly Nitrogen-Heavy";
-    methane = "Medium";
-  } else if (avgCN <= 30) {
-    status = "Excellent Condition";
-    methane = "Low";
-  } else if (avgCN <= 60) {
-    status = "Slightly Carbon-Heavy";
-    methane = "Low";
-  } else {
-    status = "Too Carbon-Heavy";
-    methane = "Low";
-  }
-
-  const decompWeeks = Math.round(avgCN / 10);
-  return { score, status, avgCN: Math.round(avgCN), methane, decompWeeks };
+function getStatus(avgCN: number) {
+  if (avgCN < 15) return { status: "Too Nitrogen-Heavy", methane: "High" };
+  if (avgCN < 25) return { status: "Slightly Nitrogen-Heavy", methane: "Medium" };
+  if (avgCN <= 30) return { status: "Excellent Condition", methane: "Low" };
+  if (avgCN <= 60) return { status: "Slightly Carbon-Heavy", methane: "Low" };
+  return { status: "Too Carbon-Heavy", methane: "Low" };
 }
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
@@ -52,15 +23,24 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 
 export default function HealthScreen() {
   const router = useRouter();
-  const result = calculateHealth(fakePile);
+  const [, refresh] = useState(0);
 
-  if (!result) {
+  useFocusEffect(useCallback(() => { refresh(n => n + 1); }, []));
+
+  const pile = getPile();
+  if (pile.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No items in your pile yet.</Text>
+        <Text style={styles.emptyText}>No items in your pile yet. Scan something!</Text>
       </View>
     );
   }
+
+  const avgCN = getAvgCN();
+  const score = getHealthScore();
+  const { status, methane } = getStatus(avgCN);
+  const decompWeeks = Math.round(avgCN / 10);
+  const result = { score, status, avgCN: Math.round(avgCN), methane, decompWeeks };
 
   return (
     <View style={styles.root}>
@@ -106,7 +86,9 @@ export default function HealthScreen() {
             </View>
             <Text style={styles.metricLabel}>C:N Ratio</Text>
             <Text style={styles.metricValue}>{result.avgCN}:1</Text>
-            <Text style={styles.metricNote}>✓ Ideal range</Text>
+            <Text style={[styles.metricNote, { color: result.avgCN >= 25 && result.avgCN <= 30 ? "#10b981" : "#f59e0b" }]}>
+              {result.avgCN >= 25 && result.avgCN <= 30 ? "✓ Ideal range" : "⚠ Off balance"}
+            </Text>
           </View>
 
           <View style={styles.metricCard}>
@@ -115,7 +97,9 @@ export default function HealthScreen() {
             </View>
             <Text style={styles.metricLabel}>Methane Output</Text>
             <Text style={styles.metricValue}>{result.methane}</Text>
-            <Text style={styles.metricNote}>✓ Eco-friendly</Text>
+            <Text style={[styles.metricNote, { color: result.methane === "Low" ? "#10b981" : "#dc2626" }]}>
+              {result.methane === "Low" ? "✓ Eco-friendly" : "⚠ High risk"}
+            </Text>
           </View>
 
           <View style={styles.metricCard}>
@@ -140,9 +124,15 @@ export default function HealthScreen() {
           <View style={[styles.suggestionCard, { backgroundColor: "#faf5ff", borderColor: "#e9d5ff" }]}>
             <Text style={styles.suggestionEmoji}>🎯</Text>
             <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle}>Perfect Balance</Text>
+              <Text style={styles.suggestionTitle}>
+                {result.avgCN >= 25 && result.avgCN <= 30 ? "Perfect Balance" : result.avgCN < 25 ? "Add Carbon Materials" : "Add Nitrogen Materials"}
+              </Text>
               <Text style={styles.suggestionBody}>
-                Your C:N ratio is excellent! Keep adding materials at your current pace.
+                {result.avgCN >= 25 && result.avgCN <= 30
+                  ? "Your C:N ratio is excellent! Keep adding materials at your current pace."
+                  : result.avgCN < 25
+                  ? "Your pile is nitrogen-heavy. Add cardboard, dry leaves, or paper to balance it."
+                  : "Your pile needs more nitrogen. Add fruit scraps, grass clippings, or coffee grounds."}
               </Text>
             </View>
           </View>
@@ -158,11 +148,17 @@ export default function HealthScreen() {
           </View>
 
           <View style={[styles.suggestionCard, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
-            <Text style={styles.suggestionEmoji}>⚡</Text>
+            <Text style={styles.suggestionEmoji}>
+              {result.methane === "Low" ? "⚡" : "⚠️"}
+            </Text>
             <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle}>Speed Boost</Text>
+              <Text style={styles.suggestionTitle}>
+                {result.methane === "Low" ? "Speed Boost" : "Methane Warning"}
+              </Text>
               <Text style={styles.suggestionBody}>
-                Chop larger items into smaller pieces to accelerate decomposition by 30%.
+                {result.methane === "Low"
+                  ? "Chop larger items into smaller pieces to accelerate decomposition by 30%."
+                  : "Your pile has high methane risk. Add more carbon materials and turn it more frequently."}
               </Text>
             </View>
           </View>
@@ -172,10 +168,10 @@ export default function HealthScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Health Breakdown</Text>
           {[
-            { label: "Material Balance", value: 95, color: "#10b981" },
-            { label: "Decomposition Rate", value: 88, color: "#10b981" },
-            { label: "Environmental Impact", value: 92, color: "#10b981" },
-            { label: "Nutrient Quality", value: 78, color: "#f59e0b" },
+            { label: "Material Balance", value: result.score, color: result.score >= 70 ? "#10b981" : "#f59e0b" },
+            { label: "Decomposition Rate", value: Math.min(100, Math.round(100 - result.decompWeeks * 3)), color: "#10b981" },
+            { label: "Environmental Impact", value: result.methane === "Low" ? 92 : result.methane === "Medium" ? 60 : 30, color: result.methane === "Low" ? "#10b981" : "#f59e0b" },
+            { label: "Nutrient Quality", value: Math.min(100, Math.round(result.score * 0.9)), color: result.score >= 70 ? "#10b981" : "#f59e0b" },
           ].map((item) => (
             <View key={item.label} style={styles.breakdownRow}>
               <View style={styles.breakdownLabelRow}>
@@ -185,17 +181,6 @@ export default function HealthScreen() {
               <ProgressBar value={item.value} color={item.color} />
             </View>
           ))}
-        </View>
-
-        {/* Warning */}
-        <View style={styles.warningCard}>
-          <Ionicons name="warning" size={20} color="#d97706" style={{ marginTop: 2 }} />
-          <View style={styles.warningText}>
-            <Text style={styles.warningTitle}>Maintenance Reminder</Text>
-            <Text style={styles.warningBody}>
-              It's been 3 days since your last turn. Consider turning your pile to improve aeration.
-            </Text>
-          </View>
         </View>
 
         <View style={{ height: 100 }} />

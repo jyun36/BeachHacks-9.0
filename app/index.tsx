@@ -1,12 +1,11 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
-import { Text, View, TouchableOpacity, Image, ScrollView, Modal } from "react-native";
+import { Text, View, TouchableOpacity, Modal } from "react-native";
 import { analyzeItem } from "../src/gemini";
 import { addToPile } from "./pileStore";
 
 export default function Index() {
   const [permission, requestPermission] = useCameraPermissions();
-  const [photos, setPhotos] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -16,8 +15,7 @@ export default function Index() {
     if (cameraRef.current) {
       const photo = await cameraRef.current.takePictureAsync({ base64: false });
       if (photo?.uri) {
-        setPhotos((prev) => [photo.uri, ...prev]);
-        setResult(null);
+setResult(null);
         setLoading(true);
         try {
           const analysis = await analyzeItem(photo.uri);
@@ -36,7 +34,7 @@ export default function Index() {
       addToPile({
         name: result.item,
         compostable: result.compostable,
-        cn_ratio: result.cn_ratio ?? "unknown",
+        cn_ratio: typeof result.cn_ratio === "number" ? result.cn_ratio : 28,
         addedAt: Date.now(),
       });
     }
@@ -120,18 +118,6 @@ export default function Index() {
         </View>
       </View>
 
-      {/* Photo list */}
-      {photos.length > 0 && (
-        <View style={{ height: 120, backgroundColor: "black" }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ padding: 10, gap: 8 }}>
-            {photos.map((uri, i) => (
-              <Image key={i} source={{ uri }}
-                style={{ width: 90, height: 90, borderRadius: 8 }} />
-            ))}
-          </ScrollView>
-        </View>
-      )}
 
       {/* Result Popup Modal */}
       <Modal visible={showModal} transparent animationType="slide">

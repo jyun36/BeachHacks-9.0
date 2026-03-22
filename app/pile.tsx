@@ -1,12 +1,14 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { getPile, clearPile, PileItem, cnRatioToNumber } from "./pileStore";
+import { getPile, clearPile, PileItem, getHealthScore } from "./pileStore";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 
 export default function PileScreen() {
   const [items, setItems] = useState<PileItem[]>([]);
+  const insets = useSafeAreaInsets();
 
   // Refresh pile every time this tab is focused
   useFocusEffect(
@@ -31,15 +33,12 @@ export default function PileScreen() {
   }
 
   const compostableCount = items.filter((i) => i.compostable).length;
-  const avgCN = items.length > 0
-    ? items.reduce((sum, i) => sum + cnRatioToNumber(i.cn_ratio), 0) / items.length
-    : 27.5;
-  const healthScore = Math.max(0, Math.round(100 - Math.abs(avgCN - 27.5) * 1.5));
+  const healthScore = getHealthScore();
 
   return (
     <View style={styles.root}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>My Compost Pile</Text>
         <TouchableOpacity onPress={handleClear}>
           <Text style={styles.clearBtn}>Clear All</Text>
@@ -72,7 +71,7 @@ export default function PileScreen() {
             </View>
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemMeta}>C:N — {item.cn_ratio}</Text>
+              <Text style={styles.itemMeta}>C:N — {item.cn_ratio}:1</Text>
             </View>
             <View style={[styles.itemBadge, { backgroundColor: item.compostable ? "#d1fae5" : "#fee2e2" }]}>
               <Text style={[styles.itemBadgeText, { color: item.compostable ? "#059669" : "#dc2626" }]}>

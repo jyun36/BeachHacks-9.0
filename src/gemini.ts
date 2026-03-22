@@ -21,9 +21,10 @@ export async function analyzeItem(photoUri: string) {
           data: base64,
         },
       },
-      `What is this object? Is it compostable?
-       Reply in JSON only, no extra text:
-       { "item": "apple core", "compostable": true, "reason": "organic waste" }`
+      `You are a composting expert. Identify the main object in this image.
+       Reply in JSON only, no extra text, no markdown:
+       { "item": "apple core", "compostable": true, "reason": "organic waste breaks down easily", "cn_ratio": 15 }
+       The cn_ratio must be a number representing the carbon-to-nitrogen ratio (e.g. apple core=15, cardboard=350, grass=20, leaves=60). If not compostable use 0.`
     ]);
 
     const text = result.response.text();
