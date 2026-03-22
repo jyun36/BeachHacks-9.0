@@ -60,12 +60,19 @@ export default function HealthScreen() {
   const [agentTips, setAgentTips] = useState<string[] | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [isLive, setIsLive] = useState(false);
+  const [lastPileIds, setLastPileIds] = useState<string>("");
 
   useFocusEffect(useCallback(() => {
-    setAgentTips(null);
-    setIsLive(false);
-    getPile().then(setPile);
-  }, []));
+    getPile().then((items) => {
+      const ids = items.map(i => i.id).join(",");
+      if (ids !== lastPileIds) {
+        setAgentTips(null);
+        setIsLive(false);
+        setLastPileIds(ids);
+      }
+      setPile(items);
+    });
+  }, [lastPileIds]));
 
   const getFallback = (items: PileItem[], r: ReturnType<typeof calculateHealth>) => {
     if (!r) return [];
