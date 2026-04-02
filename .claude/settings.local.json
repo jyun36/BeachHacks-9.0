@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find /c/Users/ryanc/.vscode/BeachHacks26 -type f \\\\\\(-name *.png -o -name *.jpg \\\\\\))"
-    ]
-  }
-}
